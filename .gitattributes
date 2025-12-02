@@ -1,3 +1,8 @@
+# Git LFS tracked patterns (geospatial and large binary assets)
+# To enable LFS storage for these patterns, install git-lfs and run:
+#   git lfs install
+# After that, newly committed matching files will be stored in LFS.
+
 *.shp filter=lfs diff=lfs merge=lfs -text
 *.dbf filter=lfs diff=lfs merge=lfs -text
 *.shx filter=lfs diff=lfs merge=lfs -text
@@ -15,3 +20,7 @@
 *.kmz filter=lfs diff=lfs merge=lfs -text
 *.xlsx filter=lfs diff=lfs merge=lfs -text
 *.pdf filter=lfs diff=lfs merge=lfs -text
+# Optional image formats (enable if you want images managed by LFS)
+#*.png filter=lfs diff=lfs merge=lfs -text
+#*.jpg filter=lfs diff=lfs merge=lfs -text
+#*.jpeg filter=lfs diff=lfs merge=lfs -text
