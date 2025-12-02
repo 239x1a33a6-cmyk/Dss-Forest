@@ -46,3 +46,28 @@ Notes about databases: If you set `USE_DATABASE=true` you must ensure the databa
 - Create a GitHub Actions workflow that builds the app and uploads build artifacts to a storage bucket (optional).
 - Add a small script to copy important static files from a bucket into `public/` at build time on Vercel.
 - Help migrate large assets from the repo/LFS into S3/R2 and update references.
+
+7) Configure GitHub Actions secrets (optional, required for automatic deploy)
+
+To enable automatic deploys from the CI workflow in this repository, add these repository secrets in GitHub (Settings → Secrets → Actions):
+
+- VERCEL_TOKEN — a Personal Token from Vercel (create via https://vercel.com/account/tokens)
+- VERCEL_ORG_ID — your Vercel organization ID (find via Vercel dashboard or `vercel projects ls --token $VERCEL_TOKEN`)
+- VERCEL_PROJECT_ID — the project ID (find via Vercel dashboard or `vercel projects inspect <project-name> --token $VERCEL_TOKEN`)
+
+Example (using Vercel CLI):
+
+```bash
+npm i -g vercel
+vercel login
+VERCEL_TOKEN=$(vercel token create "CI token")
+vercel projects ls --token "$VERCEL_TOKEN"
+vercel projects inspect <project-name> --token "$VERCEL_TOKEN" # shows projectId and orgId
+
+# Then set the secrets in GitHub repo settings (or use gh CLI):
+gh secret set VERCEL_TOKEN --body "$VERCEL_TOKEN"
+gh secret set VERCEL_ORG_ID --body "<org-id>"
+gh secret set VERCEL_PROJECT_ID --body "<project-id>"
+```
+
+Once those secrets are in place, the CI workflow will deploy to Vercel automatically on successful builds on `main`.
