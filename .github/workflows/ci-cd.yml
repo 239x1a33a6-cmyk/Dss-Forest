@@ -1,0 +1,120 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  # Placeholder for environment variables
+  # NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  frontend-build-and-test:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dss-atlas
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ./dss-atlas/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        # Continue on error if you don't want linting to block deployment
+        # continue-on-error: true
+
+      - name: Build
+        run: npm run build
+        env:
+          # Add necessary build-time secrets here
+          CI: true
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: ./dss-atlas/.next
+          retention-days: 7
+
+  python-scripts-check:
+    name: Python Scripts Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dss-atlas/scripts
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          # cache: 'pip' # Uncomment if you have a requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # If you have a requirements.txt, use: pip install -r requirements.txt
+          # For now, installing known dependencies for the patta script
+          pip install shapely
+
+      - name: Syntax Check
+        run: |
+          # Check for syntax errors without running the script
+          python -m py_compile generate_patta_dataset.py
+          echo "Python syntax check passed."
+
+  deploy:
+    name: Deploy (AWS Elastic Beanstalk)
+    needs: [frontend-build-and-test, python-scripts-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+          path: ./dss-atlas/.next
+
+      - name: Generate Deployment Package
+        run: |
+          # Create a zip file for Elastic Beanstalk
+          # We need to include the built .next folder, public folder, package.json, and next.config.js
+          # This assumes a standard Next.js deployment structure
+          cd dss-atlas
+          zip -r ../deploy.zip .next public package.json package-lock.json next.config.js
+          cd ..
+
+      - name: Deploy to EB
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ secrets.EB_APPLICATION_NAME }}
+          environment_name: ${{ secrets.EB_ENVIRONMENT_NAME }}
+          version_label: "ver-${{ github.sha }}"
+          region: ${{ secrets.AWS_REGION }}
+          deployment_package: deploy.zip
